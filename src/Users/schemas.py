@@ -1,30 +1,35 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
+from enum import Enum
 import base64
 
 
+class GenderEnum(str, Enum):
+    Мужчина = "Мужчина"
+    Женщина = "Женщина"
+
+
 class ParticipantBase(BaseModel):
-    gender: str
-    first_name: str
-    last_name: str
-    email: EmailStr
+    gender: GenderEnum = Field(..., description="Пол участника")
+    first_name: str = Field(..., description="Имя участника")
+    last_name: str = Field(..., description="Фамилия участника")
+    email: EmailStr = Field(..., description="Электронная почта участника")
 
 
 class ParticipantCreate(ParticipantBase):
-    password: str
+    password: str = Field(..., description="Пароль для авторизации")
 
 
 class ParticipantResponse(ParticipantBase):
-    id: int
-    is_active: bool
-    avatar: Optional[str] = None
+    id: int = Field(..., description="Идентификатор участника")
+    is_active: bool = Field(..., description="Активен ли участник")
+    avatar: Optional[str] = Field(None, description="Аватар участника в виде Base64")
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
     @classmethod
     def from_orm_with_avatar(cls, participant):
-        """Создание экземпляра с кодированием аватара в Base64."""
         avatar_base64 = (
             base64.b64encode(participant.avatar).decode("utf-8")
             if participant.avatar
@@ -39,3 +44,16 @@ class ParticipantResponse(ParticipantBase):
             is_active=participant.is_active,
             avatar=avatar_base64,
         )
+
+
+class MatchRequest(BaseModel):
+    user_id: int = Field(
+        ..., description="Идентификатор пользователя, который ставит лайк"
+    )
+
+
+class MatchResponse(BaseModel):
+    message: str = Field(..., description="Сообщение о результате лайка")
+    email: Optional[EmailStr] = Field(
+        None, description="Электронная почта участника при взаимной симпатии"
+    )

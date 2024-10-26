@@ -1,8 +1,9 @@
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from .models import Participant
+from .models import Participant, Match
 from .schemas import ParticipantCreate
 from typing import Optional
+from datetime import datetime, timedelta
 from src.utils.logging import AppLogger
 
 logger = AppLogger().get_logger()
@@ -43,3 +44,38 @@ class ParticipantCRUD:
             await db.rollback()
             logger.error("Ошибка при создании участника: %s", e)
             return False
+
+
+class MatchCRUD:
+    @staticmethod
+    async def create_match(
+        db: AsyncSession, user_id: int, target_user_id: int
+    ) -> Optional[Match]:
+        """Создает запись о лайке."""
+        match = Match(user_id=user_id, target_user_id=target_user_id)
+        db.add(match)
+        await db.commit()
+        return match
+
+    @staticmethod
+    async def check_mutual_like(
+        db: AsyncSession, user_id: int, target_user_id: int
+    ) -> bool:
+        """Проверяет, есть ли взаимный лайк между пользователями."""
+        result = await db.execute(
+            select(Match)
+            .where(Match.user_id == target_user_id)
+            .where(Match.target_user_id == user_id)
+        )
+        return result.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def get_daily_likes_count(db: AsyncSession, user_id: int) -> int:
+        """Возвращает количество лайков, поставленных участником за последние 24 часа."""
+        day_ago = datetime.utcnow() - timedelta(days=1)
+        result = await db.execute(
+            select(func.count(Match.id))
+            .where(Match.user_id == user_id)
+            .where(Match.created_at >= day_ago)
+        )
+        return result.scalar()
