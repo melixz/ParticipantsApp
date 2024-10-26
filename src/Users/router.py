@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/clients", tags=["Participants"])
 )
 async def create_participant(
     participant_data: ParticipantCreate, db: AsyncSession = Depends(get_db)
-):
+) -> ParticipantResponse:
     """Эндпоинт для регистрации нового участника."""
 
     # Проверка уникальности email

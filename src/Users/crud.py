@@ -14,8 +14,9 @@ class ParticipantCRUD:
         db: AsyncSession, email: str
     ) -> Optional[Participant]:
         """Получение участника по email."""
-        result = await db.scalar(select(Participant).filter_by(email=email))
-        return result
+        # Выполняем запрос и получаем результат
+        result = await db.execute(select(Participant).filter_by(email=email))
+        return result.scalar_one_or_none()
 
     @staticmethod
     async def create_participant(
