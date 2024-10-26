@@ -14,17 +14,19 @@ class ParticipantCRUD:
         db: AsyncSession, email: str
     ) -> Optional[Participant]:
         """Получение участника по email."""
-        # Выполняем запрос и получаем результат
         result = await db.execute(select(Participant).filter_by(email=email))
         return result.scalar_one_or_none()
 
     @staticmethod
     async def create_participant(
-        db: AsyncSession, participant_data: ParticipantCreate, hashed_password: str
+        db: AsyncSession,
+        participant_data: ParticipantCreate,
+        hashed_password: str,
+        avatar: bytes,
     ) -> Optional[Participant | bool]:
-        """Создание нового участника с хэшированным паролем."""
+        """Создание нового участника с хэшированным паролем и аватаркой."""
         new_participant = Participant(
-            avatar=participant_data.avatar,
+            avatar=avatar,
             gender=participant_data.gender,
             first_name=participant_data.first_name,
             last_name=participant_data.last_name,

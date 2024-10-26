@@ -14,11 +14,9 @@ Base = declarative_base()
 
 # Создаем фабрику сессий
 async_session = sessionmaker(
-    bind=engine,
-    autocommit=False,
-    autoflush=False,
-    class_=AsyncSession
+    bind=engine, autocommit=False, autoflush=False, class_=AsyncSession
 )
+
 
 async def get_db():
     """Получение сессии базы данных."""
