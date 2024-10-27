@@ -14,9 +14,7 @@ from db import get_db
 from config import settings
 from io import BytesIO
 
-router = APIRouter(
-    prefix="/api/clients", tags=["Участники"]
-)  # Обозначаем название группы как "Участники"
+router = APIRouter(prefix="/api/clients", tags=["Участники"])
 
 
 @router.post(
@@ -80,6 +78,7 @@ async def match_participant(
     """Оценка участником другого участника с проверкой на лимит."""
     user_id = match_request.user_id
 
+    # Проверка лимита лайков за день
     daily_likes_count = await MatchCRUD.get_daily_likes_count(db, user_id)
     if daily_likes_count >= settings.MAX_LIKES_PER_DAY:
         raise HTTPException(
@@ -87,8 +86,16 @@ async def match_participant(
             detail="Лимит лайков на сегодня исчерпан",
         )
 
-    await MatchCRUD.create_match(db, user_id, id)
+    try:
+        # Пытаемся создать новый лайк
+        await MatchCRUD.create_match(db, user_id, id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Вы уже поставили лайк",
+        )
 
+    # Проверяем, есть ли взаимная симпатия
     if await MatchCRUD.check_mutual_like(db, user_id, id):
         target_participant = await ParticipantCRUD.get_participant_by_id(db, id)
         if target_participant:

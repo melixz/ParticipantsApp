@@ -1,4 +1,4 @@
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models import Participant, Match
 from .schemas import ParticipantCreate
@@ -16,6 +16,16 @@ class ParticipantCRUD:
     ) -> Optional[Participant]:
         """Получение участника по email."""
         result = await db.execute(select(Participant).filter_by(email=email))
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_participant_by_id(
+        db: AsyncSession, participant_id: int
+    ) -> Optional[Participant]:
+        """Получение участника по ID."""
+        result = await db.execute(
+            select(Participant).where(Participant.id == participant_id)
+        )
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -51,7 +61,16 @@ class MatchCRUD:
     async def create_match(
         db: AsyncSession, user_id: int, target_user_id: int
     ) -> Optional[Match]:
-        """Создает запись о лайке."""
+        # Проверяем, существует ли уже лайк
+        existing_match = await db.execute(
+            select(Match).where(
+                and_(Match.user_id == user_id, Match.target_user_id == target_user_id)
+            )
+        )
+        if existing_match.scalar() is not None:
+            raise Exception("Лайк уже существует")
+
+        # Создаем лайк
         match = Match(user_id=user_id, target_user_id=target_user_id)
         db.add(match)
         await db.commit()
