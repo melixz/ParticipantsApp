@@ -1,22 +1,25 @@
+# Используем базовый образ Python
+FROM python:latest
 
-FROM python
-
+# Настраиваем буферизацию, чтобы Python выводил данные сразу
 ENV PYTHONUNBUFFERED=1
 
-RUN pip install virtualenv
-
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
-COPY requirements/dev.txt .
+# Устанавливаем virtualenv и создаем виртуальное окружение
+RUN pip install --no-cache-dir virtualenv && \
+    virtualenv venv
 
-RUN pip install virtualenv && \
-    virtualenv venv && \
-    ./venv/bin/pip install -r dev.txt
+# Копируем requirements.txt из volume и устанавливаем зависимости
+COPY requirements.txt /app/requirements.txt
+RUN ./venv/bin/pip install -r requirements.txt
 
+# Копируем все остальное приложение
 COPY . .
 
+# Добавляем виртуальное окружение в PATH
 ENV PATH="/app/venv/bin:$PATH"
 
-
+# Команда для запуска приложения
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
-
