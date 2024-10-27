@@ -5,6 +5,7 @@ from .schemas import ParticipantCreate
 from typing import Optional, List
 from datetime import datetime, timedelta
 from src.utils.logging import AppLogger
+from src.utils.distance import calculate_distance
 
 logger = AppLogger().get_logger()
 
@@ -74,17 +75,50 @@ class ParticipantCRUD:
         result = await db.execute(query)
         return result.scalars().all()
 
+    @staticmethod
+    async def get_nearby_participants(
+        db: AsyncSession,
+        base_lat: float,
+        base_lon: float,
+        max_distance: float,
+        gender: Optional[str] = None,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+    ) -> List[Participant]:
+        """Получает список участников, находящихся в пределах max_distance километров."""
+        query = select(Participant)
+
+        if gender:
+            query = query.where(Participant.gender == gender)
+        if first_name:
+            query = query.where(Participant.first_name.ilike(f"%{first_name}%"))
+        if last_name:
+            query = query.where(Participant.last_name.ilike(f"%{last_name}%"))
+
+        result = await db.execute(query)
+        participants = result.scalars().all()
+
+        # Фильтруем участников по расстоянию
+        nearby_participants = [
+            p
+            for p in participants
+            if p.latitude
+            and p.longitude
+            and calculate_distance(
+                base_lat, base_lon, float(p.latitude), float(p.longitude)
+            )
+            <= max_distance
+        ]
+
+        return nearby_participants
+
 
 class MatchCRUD:
     @staticmethod
     async def create_match(
         db: AsyncSession, user_id: int, target_user_id: int
     ) -> Optional[Match]:
-        """Создание лайка между участниками.
-
-        Проверяет, существует ли уже лайк от user_id к target_user_id. Если нет, создает новый лайк.
-        """
-        # Проверяем, существует ли уже лайк
+        """Создание лайка между участниками. Проверяет, существует ли уже лайк от user_id к target_user_id."""
         existing_match = await db.execute(
             select(Match).where(
                 and_(Match.user_id == user_id, Match.target_user_id == target_user_id)
@@ -93,7 +127,6 @@ class MatchCRUD:
         if existing_match.scalar() is not None:
             raise Exception("Лайк уже существует")
 
-        # Создаем лайк
         match = Match(user_id=user_id, target_user_id=target_user_id)
         db.add(match)
         await db.commit()

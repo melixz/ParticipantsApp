@@ -9,7 +9,6 @@ from fastapi import (
     Query,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import desc, select
 from src.Users.schemas import (
     ParticipantCreate,
     ParticipantResponse,
@@ -19,7 +18,6 @@ from src.Users.schemas import (
 )
 from src.Users.crud import ParticipantCRUD, MatchCRUD
 from src.Users.manager import user_hash_manager
-from src.Users.models import Participant
 from src.utils.image_processing import add_watermark
 from db import get_db
 from config import settings
@@ -74,10 +72,8 @@ async def create_participant(
             detail="Ошибка при создании участника",
         )
 
-    # Формируем URL для аватарки после создания
     avatar_url = f"http://127.0.0.1:8000/api/clients/avatar/{new_participant.id}"
 
-    # Возвращаем результат с аватаркой
     return ParticipantResponse.from_orm_with_avatar(
         new_participant, avatar_url=avatar_url
     )
@@ -96,7 +92,6 @@ async def match_participant(
     """Оценка участником другого участника с проверкой на лимит."""
     user_id = match_request.user_id
 
-    # Проверка лимита лайков за день
     daily_likes_count = await MatchCRUD.get_daily_likes_count(db, user_id)
     if daily_likes_count >= settings.MAX_LIKES_PER_DAY:
         raise HTTPException(
@@ -105,7 +100,6 @@ async def match_participant(
         )
 
     try:
-        # Пытаемся создать новый лайк
         await MatchCRUD.create_match(db, user_id, id)
     except Exception:
         raise HTTPException(
@@ -113,7 +107,6 @@ async def match_participant(
             detail="Вы уже поставили лайк",
         )
 
-    # Проверяем, есть ли взаимная симпатия
     if await MatchCRUD.check_mutual_like(db, user_id, id):
         target_participant = await ParticipantCRUD.get_participant_by_id(db, id)
         if target_participant:
@@ -128,41 +121,50 @@ async def match_participant(
 @router.get(
     "/list",
     response_model=List[ParticipantResponse],
-    description="Эндпоинт для получения списка участников с возможностью фильтрации и сортировки по дате регистрации",
+    description="Эндпоинт для получения списка участников с возможностью фильтрации по расстоянию и другим параметрам",
 )
 async def get_participants(
-    gender: Optional[GenderEnum] = Query(None, description="Фильтр по полу"),
+    gender: Optional[str] = Query(None, description="Фильтр по полу"),
     first_name: Optional[str] = Query(None, description="Фильтр по имени"),
     last_name: Optional[str] = Query(None, description="Фильтр по фамилии"),
-    sort_by_date: Optional[bool] = Query(
-        False, description="Сортировка по дате регистрации (по убыванию)"
+    sort_by_date: Optional[bool] = Query(False, description="Сортировка по дате"),
+    distance: Optional[float] = Query(None, description="Максимальная дистанция в км"),
+    base_lat: Optional[float] = Query(
+        None, description="Широта для фильтрации по расстоянию"
+    ),
+    base_lon: Optional[float] = Query(
+        None, description="Долгота для фильтрации по расстоянию"
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    """Эндпоинт для получения списка участников с фильтрацией и сортировкой."""
-    query = select(Participant)
+    """Эндпоинт для получения списка участников с фильтрацией по полу, имени, фамилии и расстоянию."""
+    if distance and (base_lat is None or base_lon is None):
+        raise HTTPException(
+            status_code=400,
+            detail="Для фильтрации по расстоянию необходимы базовые координаты (base_lat и base_lon).",
+        )
 
-    if gender:
-        query = query.filter(Participant.gender == gender)
-    if first_name:
-        query = query.filter(Participant.first_name.ilike(f"%{first_name}%"))
-    if last_name:
-        query = query.filter(Participant.last_name.ilike(f"%{last_name}%"))
-    if sort_by_date:
-        query = query.order_by(desc(Participant.created_at))
+    if distance:
+        participants = await ParticipantCRUD.get_nearby_participants(
+            db, base_lat, base_lon, distance, gender, first_name, last_name
+        )
     else:
-        query = query.order_by(Participant.created_at)
+        participants = await ParticipantCRUD.get_participants(
+            db, gender, first_name, last_name
+        )
 
-    result = await db.execute(query)
-    participants = result.scalars().all()
+    # Сортировка по дате
+    if sort_by_date:
+        participants.sort(key=lambda x: x.created_at, reverse=True)
+    else:
+        participants.sort(key=lambda x: x.created_at)
 
-    # Формируем avatar_url для каждого участника
+    # Добавление URL для аватара
     participants_responses = [
         ParticipantResponse.from_orm_with_avatar(
-            participant,
-            avatar_url=f"http://127.0.0.1:8000/api/clients/avatar/{participant.id}",
+            p, avatar_url=f"http://127.0.0.1:8000/api/clients/avatar/{p.id}"
         )
-        for participant in participants
+        for p in participants
     ]
 
     return participants_responses
