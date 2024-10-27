@@ -1,5 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    UploadFile,
+    File,
+    Form,
+    Query,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import desc, select
 from src.Users.schemas import (
     ParticipantCreate,
     ParticipantResponse,
@@ -9,10 +19,12 @@ from src.Users.schemas import (
 )
 from src.Users.crud import ParticipantCRUD, MatchCRUD
 from src.Users.manager import user_hash_manager
+from src.Users.models import Participant
 from src.utils.image_processing import add_watermark
 from db import get_db
 from config import settings
 from io import BytesIO
+from typing import Optional, List
 
 router = APIRouter(prefix="/api/clients", tags=["Участники"])
 
@@ -62,7 +74,13 @@ async def create_participant(
             detail="Ошибка при создании участника",
         )
 
-    return ParticipantResponse.from_orm_with_avatar(new_participant)
+    # Формируем URL для аватарки после создания
+    avatar_url = f"http://127.0.0.1:8000/api/clients/avatar/{new_participant.id}"
+
+    # Возвращаем результат с аватаркой
+    return ParticipantResponse.from_orm_with_avatar(
+        new_participant, avatar_url=avatar_url
+    )
 
 
 @router.post(
@@ -105,3 +123,46 @@ async def match_participant(
             )
     else:
         return MatchResponse(message="Лайк добавлен, но взаимной симпатии нет.")
+
+
+@router.get(
+    "/list",
+    response_model=List[ParticipantResponse],
+    description="Эндпоинт для получения списка участников с возможностью фильтрации и сортировки по дате регистрации",
+)
+async def get_participants(
+    gender: Optional[GenderEnum] = Query(None, description="Фильтр по полу"),
+    first_name: Optional[str] = Query(None, description="Фильтр по имени"),
+    last_name: Optional[str] = Query(None, description="Фильтр по фамилии"),
+    sort_by_date: Optional[bool] = Query(
+        False, description="Сортировка по дате регистрации (по убыванию)"
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Эндпоинт для получения списка участников с фильтрацией и сортировкой."""
+    query = select(Participant)
+
+    if gender:
+        query = query.filter(Participant.gender == gender)
+    if first_name:
+        query = query.filter(Participant.first_name.ilike(f"%{first_name}%"))
+    if last_name:
+        query = query.filter(Participant.last_name.ilike(f"%{last_name}%"))
+    if sort_by_date:
+        query = query.order_by(desc(Participant.created_at))
+    else:
+        query = query.order_by(Participant.created_at)
+
+    result = await db.execute(query)
+    participants = result.scalars().all()
+
+    # Формируем avatar_url для каждого участника
+    participants_responses = [
+        ParticipantResponse.from_orm_with_avatar(
+            participant,
+            avatar_url=f"http://127.0.0.1:8000/api/clients/avatar/{participant.id}",
+        )
+        for participant in participants
+    ]
+
+    return participants_responses

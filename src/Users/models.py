@@ -9,6 +9,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql import func
 from datetime import datetime
 
 Base = declarative_base()
@@ -27,6 +28,7 @@ class Participant(Base):
     longitude = Column(String, nullable=True)
     latitude = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
 
 
 class Match(Base):

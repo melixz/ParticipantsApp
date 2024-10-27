@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from enum import Enum
-import base64
+from datetime import datetime
 
 
 class GenderEnum(str, Enum):
@@ -23,18 +23,14 @@ class ParticipantCreate(ParticipantBase):
 class ParticipantResponse(ParticipantBase):
     id: int = Field(..., description="Идентификатор участника")
     is_active: bool = Field(..., description="Активен ли участник")
-    avatar: Optional[str] = Field(None, description="Аватар участника в виде Base64")
+    avatar_url: Optional[str] = Field(None, description="Ссылка на аватар участника")
+    created_at: datetime = Field(..., description="Дата регистрации участника")
 
     class Config:
         from_attributes = True
 
     @classmethod
-    def from_orm_with_avatar(cls, participant):
-        avatar_base64 = (
-            base64.b64encode(participant.avatar).decode("utf-8")
-            if participant.avatar
-            else None
-        )
+    def from_orm_with_avatar(cls, participant, avatar_url: Optional[str] = None):
         return cls(
             id=participant.id,
             gender=participant.gender,
@@ -42,7 +38,8 @@ class ParticipantResponse(ParticipantBase):
             last_name=participant.last_name,
             email=participant.email,
             is_active=participant.is_active,
-            avatar=avatar_base64,
+            avatar_url=avatar_url,
+            created_at=participant.created_at,
         )
 
 

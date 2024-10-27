@@ -2,7 +2,7 @@ from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from .models import Participant, Match
 from .schemas import ParticipantCreate
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timedelta
 from src.utils.logging import AppLogger
 
@@ -55,12 +55,35 @@ class ParticipantCRUD:
             logger.error("Ошибка при создании участника: %s", e)
             return False
 
+    @staticmethod
+    async def get_participants(
+        db: AsyncSession,
+        gender: Optional[str] = None,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+    ) -> List[Participant]:
+        """Получение списка участников с фильтрацией по полу, имени и фамилии."""
+        query = select(Participant)
+        if gender:
+            query = query.where(Participant.gender == gender)
+        if first_name:
+            query = query.where(Participant.first_name.ilike(f"%{first_name}%"))
+        if last_name:
+            query = query.where(Participant.last_name.ilike(f"%{last_name}%"))
+
+        result = await db.execute(query)
+        return result.scalars().all()
+
 
 class MatchCRUD:
     @staticmethod
     async def create_match(
         db: AsyncSession, user_id: int, target_user_id: int
     ) -> Optional[Match]:
+        """Создание лайка между участниками.
+
+        Проверяет, существует ли уже лайк от user_id к target_user_id. Если нет, создает новый лайк.
+        """
         # Проверяем, существует ли уже лайк
         existing_match = await db.execute(
             select(Match).where(
