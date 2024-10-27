@@ -87,7 +87,7 @@ async def create_participant(
             detail="Ошибка при создании участника",
         )
 
-    avatar_url = f"http://127.0.0.1:8000/api/clients/avatar/{new_participant.id}"
+    avatar_url = f"{settings.BASE_URL}/api/clients/avatar/{new_participant.id}"
 
     return ParticipantResponse.from_orm_with_avatar(
         new_participant, avatar_url=avatar_url
@@ -177,7 +177,7 @@ async def get_participants(
     # Добавление URL для аватара и координат
     participants_responses = [
         ParticipantResponse.from_orm_with_avatar(
-            p, avatar_url=f"http://127.0.0.1:8000/api/clients/avatar/{p.id}"
+            p, avatar_url=f"{settings.BASE_URL}/api/clients/avatar/{p.id}"
         )
         for p in participants
     ]
