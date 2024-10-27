@@ -6,8 +6,13 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 from src.utils.logging import AppLogger
 from src.utils.distance import calculate_distance
+from functools import lru_cache
+
 
 logger = AppLogger().get_logger()
+
+# Устанавливаем время жизни кэша (7 дней в секундах)
+CACHE_TTL = 7 * 24 * 60 * 60
 
 
 class ParticipantCRUD:
@@ -82,6 +87,7 @@ class ParticipantCRUD:
         return result.scalars().all()
 
     @staticmethod
+    @lru_cache(maxsize=1024)
     async def get_nearby_participants(
         db: AsyncSession,
         base_lat: float,
@@ -91,7 +97,7 @@ class ParticipantCRUD:
         first_name: Optional[str] = None,
         last_name: Optional[str] = None,
     ) -> List[Participant]:
-        """Получает список участников, находящихся в пределах max_distance километров."""
+        """Получает список участников, находящихся в пределах max_distance километров с кэшированием."""
         query = select(Participant)
 
         if gender:

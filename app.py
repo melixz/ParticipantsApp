@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from src.Users.router import router as participant_router
 from db import engine, Base
 import uvicorn
@@ -21,6 +22,12 @@ async def on_startup():
 async def on_shutdown():
     # Здесь можно добавить код для завершения соединений и очистки ресурсов при выключении приложения
     pass
+
+
+# Добавляем редирект с корневого пути на /docs
+@app.get("/", include_in_schema=False)
+async def redirect_to_docs():
+    return RedirectResponse(url="/docs")
 
 
 if __name__ == "__main__":
