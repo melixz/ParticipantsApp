@@ -27,6 +27,7 @@ class Participant(Base):
     hashed_password = Column(String, nullable=False)
     longitude = Column(String, nullable=True)
     latitude = Column(String, nullable=True)
+    city = Column(String, nullable=True)  # Новое поле city
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
 

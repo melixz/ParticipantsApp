@@ -19,6 +19,7 @@ from src.Users.schemas import (
 from src.Users.crud import ParticipantCRUD, MatchCRUD
 from src.Users.manager import user_hash_manager
 from src.utils.image_processing import add_watermark
+from src.utils.geolocation import get_coordinates_from_city
 from db import get_db
 from config import settings
 from io import BytesIO
@@ -40,9 +41,11 @@ async def create_participant(
     email: str = Form(..., description="Электронная почта участника"),
     password: str = Form(..., description="Пароль для доступа"),
     avatar: UploadFile = File(..., description="Файл аватарки участника"),
+    city: Optional[str] = Form(None, description="Город участника"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Эндпоинт для регистрации участника с водяным знаком на аватарке."""
+    """Эндпоинт для регистрации участника с водяным знаком на аватарке и определением координат по городу."""
+
     existing_participant = await ParticipantCRUD.get_participant_by_email(db, email)
     if existing_participant:
         raise HTTPException(
@@ -56,6 +59,12 @@ async def create_participant(
     avatar_with_watermark.seek(0)
     avatar_bytes = avatar_with_watermark.read()
 
+    latitude, longitude, display_city = None, None, city
+    if city:
+        coordinates = await get_coordinates_from_city(city)
+        if coordinates:
+            latitude, longitude, display_city = coordinates
+
     participant_data = ParticipantCreate(
         gender=gender,
         first_name=first_name,
@@ -64,7 +73,13 @@ async def create_participant(
         password=password,
     )
     new_participant = await ParticipantCRUD.create_participant(
-        db, participant_data, hashed_password, avatar=avatar_bytes
+        db,
+        participant_data,
+        hashed_password,
+        avatar=avatar_bytes,
+        latitude=str(latitude) if latitude else None,
+        longitude=str(longitude) if longitude else None,
+        city=display_city,
     )
     if not new_participant:
         raise HTTPException(
@@ -159,7 +174,7 @@ async def get_participants(
     else:
         participants.sort(key=lambda x: x.created_at)
 
-    # Добавление URL для аватара
+    # Добавление URL для аватара и координат
     participants_responses = [
         ParticipantResponse.from_orm_with_avatar(
             p, avatar_url=f"http://127.0.0.1:8000/api/clients/avatar/{p.id}"

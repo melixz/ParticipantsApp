@@ -25,6 +25,9 @@ class ParticipantResponse(ParticipantBase):
     is_active: bool = Field(..., description="Активен ли участник")
     avatar_url: Optional[str] = Field(None, description="Ссылка на аватар участника")
     created_at: datetime = Field(..., description="Дата регистрации участника")
+    latitude: Optional[str] = Field(None, description="Широта участника")
+    longitude: Optional[str] = Field(None, description="Долгота участника")
+    city: Optional[str] = Field(None, description="Город участника")
 
     class Config:
         from_attributes = True
@@ -40,6 +43,9 @@ class ParticipantResponse(ParticipantBase):
             is_active=participant.is_active,
             avatar_url=avatar_url,
             created_at=participant.created_at,
+            latitude=participant.latitude,
+            longitude=participant.longitude,
+            city=participant.city,
         )
 
 

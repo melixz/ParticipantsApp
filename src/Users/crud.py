@@ -35,8 +35,11 @@ class ParticipantCRUD:
         participant_data: ParticipantCreate,
         hashed_password: str,
         avatar: bytes,
+        latitude: Optional[str] = None,
+        longitude: Optional[str] = None,
+        city: Optional[str] = None,  # Добавлено поле city
     ) -> Optional[Participant | bool]:
-        """Создание нового участника с хэшированным паролем и аватаркой."""
+        """Создание нового участника с хэшированным паролем, аватаркой и координатами."""
         new_participant = Participant(
             avatar=avatar,
             gender=participant_data.gender,
@@ -44,6 +47,9 @@ class ParticipantCRUD:
             last_name=participant_data.last_name,
             email=participant_data.email,
             hashed_password=hashed_password,
+            latitude=latitude,
+            longitude=longitude,
+            city=city,  # Сохранение города в базе данных
         )
 
         try:
