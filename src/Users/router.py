@@ -8,6 +8,7 @@ from fastapi import (
     Form,
     Query,
 )
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.Users.schemas import (
     ParticipantCreate,
@@ -91,6 +92,29 @@ async def create_participant(
 
     return ParticipantResponse.from_orm_with_avatar(
         new_participant, avatar_url=avatar_url
+    )
+
+
+@router.get(
+    "/avatar/{id}",
+    description="Получение аватара участника по ID",
+    include_in_schema=False,
+)
+async def get_avatar(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Эндпоинт для получения аватара участника по его ID."""
+    participant = await ParticipantCRUD.get_participant_by_id(db, id)
+    if not participant or not participant.avatar:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Аватар не найден"
+        )
+
+    # Возвращаем аватар как потоковый ответ
+    return StreamingResponse(
+        BytesIO(participant.avatar),
+        media_type="image/jpeg",  # Укажите корректный MIME тип в зависимости от формата аватара
     )
 
 
